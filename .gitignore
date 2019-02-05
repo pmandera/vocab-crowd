@@ -1,0 +1,10 @@
+*.pyc
+
+build/
+dist/
+vocabtest.egg-info/
+
+*.swo
+*.swp
+
+*.c

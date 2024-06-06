@@ -7,6 +7,7 @@ import random
 import numpy as np
 import pandas as pd
 
+
 from .util import flatten, se
 
 sessions_file = 'sessions.csv'
@@ -88,13 +89,13 @@ class VocabTest(object):
         """Return new VocabTest including only user_agents and corresponding
         data that match a query."""
 
-        if not self.ua:
+        if self.ua is None:
             return None
 
         ua_ids = self.ua.query(query)['ua_id']
-        profile_ids = self.profiles[self.profiles['ua_id'].isin(
-            ua_ids)]['profile_id']
-        return self.subset_by_profile(profile_ids)
+        exp_ids = self.sessions[self.sessions['ua_id'].isin(
+            ua_ids)]['exp_id']
+        return self.subset_by_session(exp_ids)
 
     def query_by_profile(self, query):
         """Return new VocabTest including only profiles and corresponding
@@ -201,13 +202,23 @@ class VocabTest(object):
         for value, subset in subsetting_f():
             yield (value, subset.sample_sessions(sample))
 
+    def report_sizes(self):
+        print('Profiles shape:', self.profiles.shape)
+        print('Sessions shape:', self.sessions.shape)
+        print('Ld shape:', self.ld.shape)
+        print('Ld N/W counts:', self.ld.groupby(['lexicality']).size())
+        print('Ld N/W correct/incorrect counts:', self.ld.groupby(
+            ['lexicality', 'accuracy']).size())
+
+
     def conservative_subset(self,
                             max_profile_session=3,
                             min_trial_order=10,
                             min_rt=0,
                             max_rt=8000,
                             rt_adjbox=1,
-                            min_score=0.0):
+                            min_score=0.0,
+                            verbose=False):
         """Return a conservative subset of the data."""
         # this is necessary for the queries to embed
         # _local_ vars
@@ -216,24 +227,55 @@ class VocabTest(object):
             q = 'profile_id_session <= %s' % max_profile_session
             self = self.query_by_session(q)
 
+            if verbose:
+                print('\n========')
+                print('After max_profile_session filter:')
+                self.report_sizes()
+
         if min_trial_order is not None:
             q = 'trial_order >= %s' % min_trial_order
             self = self.query_by_ld(q)
 
+            if verbose:
+                print('\n========')
+                print('After min_trial_order filter:')
+                self.report_sizes()
+
         if min_rt is not None:
             q = 'rt >= %s' % min_rt
             self = self.query_by_ld(q)
+
+            if verbose:
+                print('\n========')
+                print('After min_rt filter:')
+                self.report_sizes()
+
         if max_rt is not None:
             q = 'rt <= %s' % max_rt
             self = self.query_by_ld(q)
+
+            if verbose:
+                print('\n========')
+                print('After max_rt filter:')
+                self.report_sizes()
 
         if rt_adjbox is not None:
             q = 'rt_adjbox == %s' % rt_adjbox
             self = self.query_by_ld(q)
 
+            if verbose:
+                print('\n========')
+                print('After rt_adjbox filter:')
+                self.report_sizes()
+
         if min_score is not None:
             q = 'score >= %s' % min_score
             self = self.query_by_session(q)
+
+            if verbose:
+                print('\n========')
+                print('After min_score filter:')
+                self.report_sizes()
 
         return self
 
@@ -322,7 +364,7 @@ class VocabTest(object):
         self.save_to_file(self.sessions, out_dir, sessions_file)
         self.save_to_file(self.profiles, out_dir, profiles_file)
 
-        if self.us is not None:
+        if self.ua is not None:
             self.save_to_file(self.ua, out_dir, ua_file)
 
         if self.geo is not None:
